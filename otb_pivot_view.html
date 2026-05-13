@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>OTB 品类指标核心表 - 转置视图</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif; background: #f5f6f7; color: #1f2329; }
+.header { background: #fff; border-bottom: 1px solid #e5e6eb; padding: 16px 24px; position: sticky; top: 0; z-index: 200; }
+.header h1 { font-size: 18px; font-weight: 600; }
+.header .sub { font-size: 13px; color: #8f959e; margin-top: 4px; }
+.controls { display: flex; gap: 12px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+.controls label { font-size: 13px; color: #646a73; font-weight: 500; }
+.controls select { padding: 6px 28px 6px 10px; border: 1px solid #cedce4; border-radius: 6px; font-size: 13px; background: #fff; cursor: pointer; min-width: 140px; }
+.controls select:focus { outline: none; border-color: #3370ff; }
+.content { padding: 16px 24px; }
+.cat-section { margin-bottom: 24px; background: #fff; border-radius: 8px; border: 1px solid #e5e6eb; overflow: hidden; }
+.cat-header { background: #f0f5ff; padding: 10px 16px; font-size: 14px; font-weight: 600; color: #1f2329; cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; }
+.cat-header:hover { background: #e3edff; }
+.cat-header .arrow { transition: transform 0.2s; font-size: 12px; color: #8f959e; }
+.cat-header.collapsed .arrow { transform: rotate(-90deg); }
+.cat-body { overflow: auto; max-height: 80vh; }
+.cat-body.hidden { display: none; }
+
+/* Table with frozen header row and frozen left columns */
+.table-wrap { position: relative; overflow: auto; max-height: calc(80vh - 40px); }
+table { width: max-content; min-width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+th, td { padding: 6px 10px; border-bottom: 1px solid #f0f1f3; white-space: nowrap; text-align: right; }
+th { background: #fafafa; color: #646a73; font-weight: 500; font-size: 12px; z-index: 10; }
+/* Frozen header row */
+thead tr { position: sticky; top: 0; z-index: 20; }
+thead th { position: sticky; top: 0; background: #fafafa; border-bottom: 2px solid #dcdfe6; }
+/* Frozen left columns */
+th.col-group, td.col-group { position: sticky; left: 0; z-index: 12; background: inherit; }
+th.col-metric, td.col-metric { position: sticky; left: 180px; z-index: 12; background: inherit; border-right: 2px solid #e5e6eb; }
+th.col-group { background: #fafafa; z-index: 25; left: 0; }
+th.col-metric { background: #fafafa; z-index: 25; left: 180px; }
+
+td.col-group { text-align: left; color: #8f959e; font-size: 12px; font-weight: 600; background: #f9fafb; min-width: 180px; max-width: 180px; }
+td.col-metric { text-align: left; font-weight: 500; color: #1f2329; min-width: 160px; background: #fff; }
+
+td.val { font-variant-numeric: tabular-nums; min-width: 100px; }
+td.null-val { color: #d0d3d6; }
+tr:hover td { background: #f5f8ff !important; }
+tr:hover td.col-group { background: #eef2ff !important; }
+tr:hover td.col-metric { background: #f5f8ff !important; }
+/* Group separator row */
+tr.group-sep td { border-top: 2px solid #e5e6eb; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>OTB 品类指标核心表 - 转置视图</h1>
+  <div class="sub">行 = 品类 × 指标 | 列 = 月份 | 数据来源：飞书多维表格品类核心指标表</div>
+  <div class="controls">
+    <div>
+      <label>品类筛选</label>
+      <select id="catFilter"><option value="">全部品类</option></select>
+    </div>
+    <div>
+      <label>指标分组</label>
+      <select id="groupFilter"><option value="">全部分组</option></select>
+    </div>
+    <div>
+      <label>展开/收起</label>
+      <select id="expandCtrl">
+        <option value="all">全部展开</option>
+        <option value="none">全部收起</option>
+      </select>
+    </div>
+    <div style="margin-left:auto; display:flex; gap:8px;">
+      <button id="btnExportCsv" style="padding:6px 16px; border:1px solid #cedce4; border-radius:6px; background:#fff; cursor:pointer; font-size:13px; color:#646a73;" onmouseover="this.style.borderColor='#3370ff';this.style.color='#3370ff'" onmouseout="this.style.borderColor='#cedce4';this.style.color='#646a73'">📥 导出 CSV</button>
+      <button id="btnExportExcel" style="padding:6px 16px; border:1px solid #3370ff; border-radius:6px; background:#3370ff; cursor:pointer; font-size:13px; color:#fff; font-weight:500;" onmouseover="this.style.background='#2860e0'" onmouseout="this.style.background='#3370ff'">📥 导出 Excel</button>
+    </div>
+  </div>
+</div>
+
+<div class="content" id="content"></div>
+
+<script>
+// Format helpers
+function fmtVal(val, fmt) {
+  if (val === null || val === undefined) return '';
+  if (fmt === 'amt') return val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (fmt === 'pct') return (val * 100).toFixed(1) + '%';
+  if (fmt === 'qty') return Math.round(val).toLocaleString('en-US');
+  if (fmt === 'prc') return val.toFixed(2);
+  if (fmt === 'num') return val.toFixed(1);
+  return val;
+}
+
+let DATA = null;
+
+function render() {
+  const catFilter = document.getElementById('catFilter').value;
+  const groupFilter = document.getElementById('groupFilter').value;
+  const expandCtrl = document.getElementById('expandCtrl').value;
+  const container = document.getElementById('content');
+
+  // Filter rows
+  let rows = DATA.pivotRows;
+  if (catFilter) rows = rows.filter(r => r.catCode === catFilter);
+  if (groupFilter) rows = rows.filter(r => r.metricGroup === groupFilter);
+
+  // Build metric order map
+  const orderMap = {};
+  DATA.metricOrder.forEach((name, idx) => { orderMap[name] = idx; });
+
+  // Group by category
+  const byCat = {};
+  for (const row of rows) {
+    if (!byCat[row.catCode]) byCat[row.catCode] = { name: row.catName, rows: [] };
+    byCat[row.catCode].rows.push(row);
+  }
+
+  const catCodes = Object.keys(byCat).sort();
+  const months = DATA.monthsOrder;
+
+  let html = '';
+  for (const cc of catCodes) {
+    const cat = byCat[cc];
+    const isCollapsed = expandCtrl === 'none';
+    html += `<div class="cat-section">`;
+    html += `<div class="cat-header ${isCollapsed ? 'collapsed' : ''}" onclick="toggleCat(this)">
+      <span>${cat.name} (${cc})</span>
+      <span class="arrow">▼</span>
+    </div>`;
+    html += `<div class="cat-body ${isCollapsed ? 'hidden' : ''}">`;
+    html += `<div class="table-wrap"><table><thead><tr>`;
+    html += `<th class="col-group">指标分组</th>`;
+    html += `<th class="col-metric">指标名称</th>`;
+    for (const m of months) {
+      html += `<th>${m}</th>`;
+    }
+    html += `</tr></thead><tbody>`;
+
+    // Sort rows by defined metric order
+    const sortedRows = cat.rows.sort((a, b) => {
+      const oa = orderMap[a.metricName] !== undefined ? orderMap[a.metricName] : 9999;
+      const ob = orderMap[b.metricName] !== undefined ? orderMap[b.metricName] : 9999;
+      return oa - ob;
+    });
+
+    // Pre-calculate rowspan for group merging
+    // Count consecutive rows with same group
+    const groupSpans = [];
+    let i = 0;
+    while (i < sortedRows.length) {
+      const group = sortedRows[i].metricGroup;
+      let span = 1;
+      while (i + span < sortedRows.length && sortedRows[i + span].metricGroup === group) {
+        span++;
+      }
+      groupSpans.push({ group, span, startIdx: i });
+      i += span;
+    }
+
+    // Render rows
+    let spanIdx = 0;
+    for (let ri = 0; ri < sortedRows.length; ri++) {
+      const row = sortedRows[ri];
+      const gs = groupSpans[spanIdx];
+      const isGroupStart = (ri === gs.startIdx);
+      const isFirstRow = (ri === 0);
+      const isGroupBorder = isGroupStart && ri > 0;
+
+      html += `<tr class="${isGroupBorder ? 'group-sep' : ''}">`;
+
+      // Group cell: only render on first row of group, with rowspan
+      if (isGroupStart) {
+        html += `<td class="col-group" rowspan="${gs.span}">${gs.group}</td>`;
+      }
+
+      // Metric name cell
+      html += `<td class="col-metric">${row.metricName}</td>`;
+
+      // Month value cells
+      for (const m of months) {
+        const val = row.months[m];
+        const display = val !== null && val !== undefined ? fmtVal(val, row.fmt) : '';
+        const cls = val === null || val === undefined ? 'val null-val' : 'val';
+        html += `<td class="${cls}">${display}</td>`;
+      }
+      html += `</tr>`;
+
+      // Advance spanIdx when we've passed current group
+      if (ri === gs.startIdx + gs.span - 1) {
+        spanIdx++;
+      }
+    }
+
+    html += `</tbody></table></div></div></div>`;
+  }
+
+  container.innerHTML = html;
+}
+
+function toggleCat(el) {
+  el.classList.toggle('collapsed');
+  const body = el.nextElementSibling;
+  body.classList.toggle('hidden');
+}
+
+// ========== Export functions ==========
+function getFilteredData() {
+  const catFilter = document.getElementById('catFilter').value;
+  const groupFilter = document.getElementById('groupFilter').value;
+  let rows = DATA.pivotRows;
+  if (catFilter) rows = rows.filter(r => r.catCode === catFilter);
+  if (groupFilter) rows = rows.filter(r => r.metricGroup === groupFilter);
+
+  const orderMap = {};
+  DATA.metricOrder.forEach((name, idx) => { orderMap[name] = idx; });
+
+  const byCat = {};
+  for (const row of rows) {
+    if (!byCat[row.catCode]) byCat[row.catCode] = { name: row.catName, rows: [] };
+    byCat[row.catCode].rows.push(row);
+  }
+
+  const catCodes = Object.keys(byCat).sort();
+  const months = DATA.monthsOrder;
+  return { byCat, catCodes, months, orderMap };
+}
+
+function exportCsv() {
+  const { byCat, catCodes, months, orderMap } = getFilteredData();
+  const BOM = '\uFEFF'; // UTF-8 BOM for Excel Chinese support
+  let csv = BOM;
+
+  // Header
+  csv += ['品类', '指标分组', '指标名称', ...months].join(',') + '\n';
+
+  for (const cc of catCodes) {
+    const cat = byCat[cc];
+    const sortedRows = cat.rows.sort((a, b) => (orderMap[a.metricName] ?? 9999) - (orderMap[b.metricName] ?? 9999));
+    for (const row of sortedRows) {
+      const vals = months.map(m => {
+        const v = row.months[m];
+        if (v === null || v === undefined) return '';
+        const display = fmtVal(v, row.fmt);
+        // Escape comma in CSV
+        return display.includes(',') ? '"' + display + '"' : display;
+      });
+      csv += [cat.name + '(' + cc + ')', row.metricGroup, row.metricName, ...vals].join(',') + '\n';
+    }
+  }
+
+  downloadFile(csv, 'OTB品类指标转置视图.csv', 'text/csv;charset=utf-8');
+}
+
+function exportExcel() {
+  const { byCat, catCodes, months, orderMap } = getFilteredData();
+
+  // Build simple XML spreadsheet (Excel can open .xlsx with Office Open XML)
+  // Using HTML table approach - most compatible
+  let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html16">';
+  html += '<head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>OTB转置视图</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->';
+  html += '<style>td,th { mso-number-format:"\@"; font-size:11pt; } .amt { mso-number-format:"#,##0.00"; } .pct { mso-number-format:"0.0%"; } .qty { mso-number-format:"#,##0"; } .prc { mso-number-format:"0.00"; } .num { mso-number-format:"0.0"; }</style>';
+  html += '</head><body>';
+  html += '<table border="1" cellspacing="0" cellpadding="4">';
+
+  // Header
+  html += '<tr><th>品类</th><th>指标分组</th><th>指标名称</th>';
+  for (const m of months) { html += `<th>${m}</th>`; }
+  html += '</tr>';
+
+  for (const cc of catCodes) {
+    const cat = byCat[cc];
+    const sortedRows = cat.rows.sort((a, b) => (orderMap[a.metricName] ?? 9999) - (orderMap[b.metricName] ?? 9999));
+    for (const row of sortedRows) {
+      html += `<tr><td>${cat.name}(${cc})</td><td>${row.metricGroup}</td><td>${row.metricName}</td>`;
+      for (const m of months) {
+        const v = row.months[m];
+        if (v === null || v === undefined) {
+          html += '<td></td>';
+        } else {
+          // Use raw number with Excel format class for proper formatting
+          html += `<td class="${row.fmt}">${v}</td>`;
+        }
+      }
+      html += '</tr>';
+    }
+  }
+
+  html += '</table></body></html>';
+  downloadFile(html, 'OTB品类指标转置视图.xls', 'application/vnd.ms-excel');
+}
+
+function downloadFile(content, filename, mimeType) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function setupExportButtons() {
+  document.getElementById('btnExportCsv').addEventListener('click', exportCsv);
+  document.getElementById('btnExportExcel').addEventListener('click', exportExcel);
+}
+
+// Init
+fetch('pivot_data.json')
+  .then(r => r.json())
+  .then(data => {
+    DATA = data;
+
+    const catSel = document.getElementById('catFilter');
+    const catCodes = Object.keys(DATA.categories).sort();
+    for (const cc of catCodes) {
+      const opt = document.createElement('option');
+      opt.value = cc;
+      opt.textContent = DATA.categories[cc] + ' (' + cc + ')';
+      catSel.appendChild(opt);
+    }
+
+    const groupSel = document.getElementById('groupFilter');
+    // Use metric order to get groups in display order
+    const seenGroups = new Set();
+    const orderedGroups = [];
+    for (const row of DATA.pivotRows) {
+      const g = row.metricGroup;
+      if (!seenGroups.has(g)) { seenGroups.add(g); orderedGroups.push(g); }
+    }
+    for (const g of orderedGroups) {
+      const opt = document.createElement('option');
+      opt.value = g;
+      opt.textContent = g;
+      groupSel.appendChild(opt);
+    }
+
+    catSel.addEventListener('change', render);
+    groupSel.addEventListener('change', render);
+    document.getElementById('expandCtrl').addEventListener('change', render);
+    setupExportButtons();
+
+    render();
+  });
+</script>
+</body>
+</html>
