@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>OTB 品类指标核心表 - 转置视图</title>
+<title>OTB Category Metrics - Pivot View</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif; background: #f5f6f7; color: #1f2329; }
@@ -51,27 +51,27 @@ tr.group-sep td { border-top: 2px solid #e5e6eb; }
 <body>
 
 <div class="header">
-  <h1>OTB 品类指标核心表 - 转置视图</h1>
-  <div class="sub">行 = 品类 × 指标 | 列 = 月份 | 数据来源：飞书多维表格品类核心指标表</div>
+  <h1>OTB Category Metrics - Pivot View</h1>
+  <div class="sub">Rows = Category × Metric | Columns = Month | Data Source: Feishu Base Category Core Metrics Table</div>
   <div class="controls">
     <div>
-      <label>品类筛选</label>
-      <select id="catFilter"><option value="">全部品类</option></select>
+      <label>Category</label>
+      <select id="catFilter"><option value="">All Categories</option></select>
     </div>
     <div>
-      <label>指标分组</label>
-      <select id="groupFilter"><option value="">全部分组</option></select>
+      <label>Metric Group</label>
+      <select id="groupFilter"><option value="">All Groups</option></select>
     </div>
     <div>
-      <label>展开/收起</label>
+      <label>Expand/Collapse</label>
       <select id="expandCtrl">
-        <option value="all">全部展开</option>
-        <option value="none">全部收起</option>
+        <option value="all">Expand All</option>
+        <option value="none">Collapse All</option>
       </select>
     </div>
     <div style="margin-left:auto; display:flex; gap:8px;">
-      <button id="btnExportCsv" style="padding:6px 16px; border:1px solid #cedce4; border-radius:6px; background:#fff; cursor:pointer; font-size:13px; color:#646a73;" onmouseover="this.style.borderColor='#3370ff';this.style.color='#3370ff'" onmouseout="this.style.borderColor='#cedce4';this.style.color='#646a73'">📥 导出 CSV</button>
-      <button id="btnExportExcel" style="padding:6px 16px; border:1px solid #3370ff; border-radius:6px; background:#3370ff; cursor:pointer; font-size:13px; color:#fff; font-weight:500;" onmouseover="this.style.background='#2860e0'" onmouseout="this.style.background='#3370ff'">📥 导出 Excel</button>
+      <button id="btnExportCsv" style="padding:6px 16px; border:1px solid #cedce4; border-radius:6px; background:#fff; cursor:pointer; font-size:13px; color:#646a73;" onmouseover="this.style.borderColor='#3370ff';this.style.color='#3370ff'" onmouseout="this.style.borderColor='#cedce4';this.style.color='#646a73'">📥 Export CSV</button>
+      <button id="btnExportExcel" style="padding:6px 16px; border:1px solid #3370ff; border-radius:6px; background:#3370ff; cursor:pointer; font-size:13px; color:#fff; font-weight:500;" onmouseover="this.style.background='#2860e0'" onmouseout="this.style.background='#3370ff'">📥 Export Excel</button>
     </div>
   </div>
 </div>
@@ -128,8 +128,8 @@ function render() {
     </div>`;
     html += `<div class="cat-body ${isCollapsed ? 'hidden' : ''}">`;
     html += `<div class="table-wrap"><table><thead><tr>`;
-    html += `<th class="col-group">指标分组</th>`;
-    html += `<th class="col-metric">指标名称</th>`;
+    html += `<th class="col-group">Metric Group</th>`;
+    html += `<th class="col-metric">Metric Name</th>`;
     for (const m of months) {
       html += `<th>${m}</th>`;
     }
@@ -230,7 +230,7 @@ function exportCsv() {
   let csv = BOM;
 
   // Header
-  csv += ['品类', '指标分组', '指标名称', ...months].join(',') + '\n';
+  csv += ['Category', 'Metric Group', 'Metric Name', ...months].join(',') + '\n';
 
   for (const cc of catCodes) {
     const cat = byCat[cc];
@@ -247,7 +247,7 @@ function exportCsv() {
     }
   }
 
-  downloadFile(csv, 'OTB品类指标转置视图.csv', 'text/csv;charset=utf-8');
+  downloadFile(csv, 'OTB_Category_Metrics_Pivot.csv', 'text/csv;charset=utf-8');
 }
 
 function exportExcel() {
@@ -256,13 +256,13 @@ function exportExcel() {
   // Build simple XML spreadsheet (Excel can open .xlsx with Office Open XML)
   // Using HTML table approach - most compatible
   let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html16">';
-  html += '<head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>OTB转置视图</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->';
+  html += '<head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>OTB Pivot View</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->';
   html += '<style>td,th { mso-number-format:"\@"; font-size:11pt; } .amt { mso-number-format:"#,##0.00"; } .pct { mso-number-format:"0.0%"; } .qty { mso-number-format:"#,##0"; } .prc { mso-number-format:"0.00"; } .num { mso-number-format:"0.0"; }</style>';
   html += '</head><body>';
   html += '<table border="1" cellspacing="0" cellpadding="4">';
 
   // Header
-  html += '<tr><th>品类</th><th>指标分组</th><th>指标名称</th>';
+  html += '<tr><th>Category</th><th>Metric Group</th><th>Metric Name</th>';
   for (const m of months) { html += `<th>${m}</th>`; }
   html += '</tr>';
 
@@ -285,7 +285,7 @@ function exportExcel() {
   }
 
   html += '</table></body></html>';
-  downloadFile(html, 'OTB品类指标转置视图.xls', 'application/vnd.ms-excel');
+  downloadFile(html, 'OTB_Category_Metrics_Pivot.xls', 'application/vnd.ms-excel');
 }
 
 function downloadFile(content, filename, mimeType) {
