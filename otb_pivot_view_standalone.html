@@ -510,6 +510,12 @@ Promise.resolve({"categories":{"1":"香水香氛","2":"彩妆","3":"护肤","4":
     setupExportButtons();
 
     render();
+
+    // Auto-export via URL parameter: ?export=excel or ?export=csv
+    const params = new URLSearchParams(window.location.search);
+    const autoExport = params.get('export');
+    if (autoExport === 'excel') setTimeout(() => exportExcel(), 500);
+    if (autoExport === 'csv')   setTimeout(() => exportCsv(),   500);
   });
 </script>
 </body>
