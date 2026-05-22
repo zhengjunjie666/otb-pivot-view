@@ -302,7 +302,7 @@ async function exportExcel() {
 
   // Number format map
   const fmtMap = {
-    amt: '0.0"M"',
+    amt: '#,##0.0,,"M"',
     pct: '0.00%',
     qty: '#,##0',
     prc: '0.00',
@@ -310,10 +310,9 @@ async function exportExcel() {
   };
   const BASE_FONT = 'DengXian'; // 等线
 
-  // Helper: scale amt values to millions
+  // Helper: keep raw value (amt uses Excel format scaling, not JS division)
   function toExcelVal(v, fmt) {
     if (v === null || v === undefined) return null;
-    if (fmt === 'amt') return v / 1000000;
     return v;
   }
 
