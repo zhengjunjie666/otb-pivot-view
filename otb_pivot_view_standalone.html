@@ -485,7 +485,7 @@ Promise.resolve({"categories":{"1":"Scented Products","2":"Cosmetics","3":"Skinc
     for (const cc of catCodes) {
       const opt = document.createElement('option');
       opt.value = cc;
-      opt.textContent = DATA.categories[cc] + ' (' + cc + ')';
+      opt.textContent = DATA.categories[cc];
       catSel.appendChild(opt);
     }
 
